@@ -295,7 +295,7 @@ bool Renderer::CreateGraphicsPipelines() {
   VkPipelineRasterizationStateCreateInfo raster{};
   raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
   raster.polygonMode = VK_POLYGON_MODE_FILL;
-  raster.cullMode = VK_CULL_MODE_NONE;
+  raster.cullMode = VK_CULL_MODE_BACK_BIT;
   raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   raster.lineWidth = 1.0f;
 

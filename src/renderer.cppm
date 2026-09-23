@@ -7,6 +7,7 @@ module;
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -153,14 +154,23 @@ private:
   VkBuffer floor_tile_buffer_ = VK_NULL_HANDLE;
   // Floor tile buffer memory.
   VkDeviceMemory floor_tile_memory_ = VK_NULL_HANDLE;
-  // Number of wall instances.
+  // Number of wall instances drawn last frame after frustum cull.
   uint32_t wall_instance_count_ = 0;
-  // Number of floor instances.
+  // Number of floor instances drawn last frame after frustum cull.
   uint32_t floor_instance_count_ = 0;
+  // Full CPU-side wall tile list, filtered per frame by frustum culling.
+  std::vector<glm::vec2> wall_tiles_cpu_;
+  // Full CPU-side floor tile list, filtered per frame by frustum culling.
+  std::vector<glm::vec2> floor_tiles_cpu_;
   // Minimap cell type buffer, one uint per maze tile, row-major.
+  // Encoding: 0 = wall culled, 1 = floor culled, 2 = wall visible,
+  // 3 = floor visible. Refreshed per frame from the frustum cull.
   VkBuffer minimap_buffer_ = VK_NULL_HANDLE;
   // Minimap buffer memory.
   VkDeviceMemory minimap_memory_ = VK_NULL_HANDLE;
+  // CPU-side base cell types, one uint per maze tile, row-major:
+  // 0 = wall, 1 = floor.  Use to rebuild the visibility encoding.
+  std::vector<std::uint32_t> minimap_cells_cpu_;
   // Minimap grid dimensions in tiles, cached from `BuildMaze`.
   glm::ivec2 minimap_grid_{0, 0};
   // Minimap start tile, cached from `BuildMaze`.
@@ -441,6 +451,31 @@ private:
   // Create semaphores and fences.
   // Return true on success, false on failure.
   bool CreateSyncObjects();
+
+  // Extract the six world-space frustum planes from a view-projection
+  // matrix.
+  // - `view_projection` - Combined projection * view matrix.
+  // Return normalized planes pointing inside the frustum.
+  [[nodiscard]] static std::array<glm::vec4, 6>
+  ExtractFrustumPlanes(const glm::mat4 &view_projection);
+
+  // Test an axis-aligned box against frustum planes.
+  // - `box_min`, `box_max` - Box corners in world space.
+  // - `planes` - Frustum planes from `ExtractFrustumPlanes`.
+  // Return true when the box intersects or is inside the frustum.
+  [[nodiscard]] static bool
+  BoxInFrustum(const glm::vec3 &box_min, const glm::vec3 &box_max,
+               const std::array<glm::vec4, 6> &planes);
+
+  // Filter cached tiles against the camera frustum and upload the visible
+  // prefix into the tile SSBOs for this frame.
+  // - `camera` - Camera used for the view matrix.
+  // - `aspect` - Aspect ratio of the viewport.
+  void CullTilesToFrustum(const Camera &camera, float aspect);
+
+  // Refresh the minimap visibility encoding from frustum planes.
+  // - `planes` - Frustum planes from `ExtractFrustumPlanes`.
+  void UpdateMinimapCulling(const std::array<glm::vec4, 6> &planes);
 
   // Upload view-projection, light, and ambient for one frame.
   // - `frame` - In-flight frame index.

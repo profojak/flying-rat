@@ -20,15 +20,17 @@ struct MinimapPush {
 [[vk::push_constant]]
 MinimapPush push;
 
-// One cell type per maze tile, row-major: 0 = wall, 1 = empty.
+// One cell encoding per maze tile, row-major: 0 = wall culled,
+// 1 = floor culled, 2 = wall visible, 3 = floor visible.
+// NOTE: Must match the encoding in `Renderer::UpdateMinimapCulling`.
 [[vk::binding(1, 0)]]
 StructuredBuffer<uint> cells;
 
 struct VSOutput {
   // Clip-space position of the vertex.
   float4 position : SV_Position;
-  // Cell kind: -1 = panel, 0 = wall, 1 = floor, 2 = start, 3 = exit,
-  // 4 = player.
+  // Cell kind: -1 = panel, 0 = wall culled, 1 = floor culled, 2 = start,
+  // 3 = exit, 4 = player, 5 = wall visible, 6 = floor visible.
   float kind : TEXCOORD1;
 };
 
@@ -83,10 +85,15 @@ VSOutput VertexMain(uint vertexID : SV_VertexID,
     output.kind = 2.0f;
   } else if (SameCell(cell, push.exit)) {
     output.kind = 3.0f;
-  } else if (cells[index] == 0) {
-    output.kind = 0.0f;
   } else {
-    output.kind = 1.0f;
+    uint code = cells[index];
+    bool visible = code >= 2u;
+    uint base = visible ? code - 2u : code;
+    if (base == 0u) {
+      output.kind = visible ? 5.0f : 0.0f;
+    } else {
+      output.kind = visible ? 6.0f : 1.0f;
+    }
   }
   return output;
 }
@@ -98,10 +105,12 @@ float4 FragmentMain(VSOutput input) : SV_Target {
     return float4(0.03f, 0.04f, 0.06f, 1.0f);
   }
   if (input.kind < 0.5f) {
-    return float4(0.16f, 0.17f, 0.21f, 1.0f);
+    // Wall culled.
+    return float4(0.10f, 0.11f, 0.15f, 1.0f);
   }
   if (input.kind < 1.5f) {
-    return float4(0.72f, 0.73f, 0.76f, 1.0f);
+    // Floor culled.
+    return float4(0.28f, 0.29f, 0.33f, 1.0f);
   }
   if (input.kind < 2.5f) {
     return float4(0.20f, 0.75f, 0.35f, 1.0f);
@@ -109,7 +118,15 @@ float4 FragmentMain(VSOutput input) : SV_Target {
   if (input.kind < 3.5f) {
     return float4(0.90f, 0.28f, 0.22f, 1.0f);
   }
+  if (input.kind < 4.5f) {
+    // Player tile highlight.
+    return float4(1.0f, 0.85f, 0.20f, 1.0f);
+  }
+  if (input.kind < 5.5f) {
+    // Wall visible.
+    return float4(0.25f, 0.55f, 0.95f, 1.0f);
+  }
 
-  // Player tile highlight.
-  return float4(1.0f, 0.85f, 0.20f, 1.0f);
+  // Floor visible.
+  return float4(0.75f, 0.76f, 0.80f, 1.0f);
 }

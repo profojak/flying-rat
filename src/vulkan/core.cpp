@@ -7,6 +7,7 @@ module;
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -99,6 +100,8 @@ void Renderer::BuildMaze(const Maze &maze) {
     }
   }
 
+  wall_tiles_cpu_ = walls;
+  floor_tiles_cpu_ = floors;
   RecreateTileBuffer(wall_tile_buffer_, wall_tile_memory_, walls,
                      wall_instance_count_);
   RecreateTileBuffer(floor_tile_buffer_, floor_tile_memory_, floors,
@@ -111,6 +114,162 @@ void Renderer::BuildMaze(const Maze &maze) {
                wall_instance_count_, floor_instance_count_);
 }
 
+std::array<glm::vec4, 6>
+Renderer::ExtractFrustumPlanes(const glm::mat4 &view_projection) {
+  const glm::vec4 row0(view_projection[0][0], view_projection[1][0],
+                       view_projection[2][0], view_projection[3][0]);
+  const glm::vec4 row1(view_projection[0][1], view_projection[1][1],
+                       view_projection[2][1], view_projection[3][1]);
+  const glm::vec4 row2(view_projection[0][2], view_projection[1][2],
+                       view_projection[2][2], view_projection[3][2]);
+  const glm::vec4 row3(view_projection[0][3], view_projection[1][3],
+                       view_projection[2][3], view_projection[3][3]);
+
+  std::array<glm::vec4, 6> planes{row3 + row0, row3 - row0, row3 + row1,
+                                  row3 - row1, row2,        row3 - row2};
+  for (auto &plane : planes) {
+    const float length = glm::length(glm::vec3(plane.x, plane.y, plane.z));
+    if (length > 1e-8f) {
+      plane /= length;
+    }
+  }
+  return planes;
+}
+
+bool Renderer::BoxInFrustum(const glm::vec3 &box_min, const glm::vec3 &box_max,
+                            const std::array<glm::vec4, 6> &planes) {
+  for (const auto &plane : planes) {
+    const glm::vec3 normal(plane.x, plane.y, plane.z);
+    glm::vec3 positive = box_min;
+    if (normal.x >= 0.0f) {
+      positive.x = box_max.x;
+    }
+    if (normal.y >= 0.0f) {
+      positive.y = box_max.y;
+    }
+    if (normal.z >= 0.0f) {
+      positive.z = box_max.z;
+    }
+    if (glm::dot(normal, positive) + plane.w < 0.0f) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void Renderer::UpdateMinimapCulling(const std::array<glm::vec4, 6> &planes) {
+  if (device_ == VK_NULL_HANDLE || minimap_buffer_ == VK_NULL_HANDLE ||
+      minimap_memory_ == VK_NULL_HANDLE) {
+    return;
+  }
+  if (minimap_grid_.x <= 0 || minimap_grid_.y <= 0 ||
+      minimap_cells_cpu_.empty()) {
+    return;
+  }
+
+  const float tile = config::tile_size;
+  const float height = config::wall_height;
+  const std::size_t count = minimap_cells_cpu_.size();
+
+  std::vector<std::uint32_t> encoded;
+  encoded.reserve(count);
+  for (std::size_t i = 0; i < count; ++i) {
+    const int x = static_cast<int>(
+        i % static_cast<std::size_t>(std::max(minimap_grid_.x, 1)));
+    const int y = static_cast<int>(
+        i / static_cast<std::size_t>(std::max(minimap_grid_.x, 1)));
+    const bool is_wall = minimap_cells_cpu_[i] == 0u;
+    const glm::vec3 box_min(static_cast<float>(x) * tile,
+                            is_wall ? 0.0f : -0.1f,
+                            static_cast<float>(y) * tile);
+    const glm::vec3 box_max((static_cast<float>(x) + 1.0f) * tile,
+                            is_wall ? height : 0.1f,
+                            (static_cast<float>(y) + 1.0f) * tile);
+    const bool visible = BoxInFrustum(box_min, box_max, planes);
+    encoded.push_back(minimap_cells_cpu_[i] + (visible ? 2u : 0u));
+  }
+
+  void *mapped = nullptr;
+  const VkDeviceSize size = encoded.size() * sizeof(std::uint32_t);
+  if (vkMapMemory(device_, minimap_memory_, 0, size, 0, &mapped) ==
+          VK_SUCCESS &&
+      mapped != nullptr) {
+    std::memcpy(mapped, encoded.data(), static_cast<std::size_t>(size));
+    vkUnmapMemory(device_, minimap_memory_);
+  }
+}
+
+void Renderer::CullTilesToFrustum(const Camera &camera, float aspect) {
+  if (device_ == VK_NULL_HANDLE) {
+    return;
+  }
+  if (wall_tiles_cpu_.empty() && floor_tiles_cpu_.empty()) {
+    wall_instance_count_ = 0;
+    floor_instance_count_ = 0;
+    return;
+  }
+
+  for (auto fence : in_flight_) {
+    if (fence != VK_NULL_HANDLE) {
+      vkWaitForFences(device_, 1, &fence, VK_TRUE,
+                      std::numeric_limits<uint64_t>::max());
+    }
+  }
+
+  const glm::mat4 view_projection =
+      Camera::ProjectionMatrix(aspect) * camera.ViewMatrix();
+  const auto planes = ExtractFrustumPlanes(view_projection);
+
+  const float tile = config::tile_size;
+  const float height = config::wall_height;
+
+  std::vector<glm::vec2> visible;
+  visible.reserve(wall_tiles_cpu_.size());
+  for (const auto &tile_xy : wall_tiles_cpu_) {
+    const glm::vec3 box_min(tile_xy.x * tile, 0.0f, tile_xy.y * tile);
+    const glm::vec3 box_max((tile_xy.x + 1.0f) * tile, height,
+                            (tile_xy.y + 1.0f) * tile);
+    if (BoxInFrustum(box_min, box_max, planes)) {
+      visible.push_back(tile_xy);
+    }
+  }
+  if (!visible.empty() && wall_tile_memory_ != VK_NULL_HANDLE) {
+    void *mapped = nullptr;
+    const VkDeviceSize size = visible.size() * sizeof(glm::vec2);
+    if (vkMapMemory(device_, wall_tile_memory_, 0, size, 0, &mapped) ==
+            VK_SUCCESS &&
+        mapped != nullptr) {
+      std::memcpy(mapped, visible.data(), static_cast<std::size_t>(size));
+      vkUnmapMemory(device_, wall_tile_memory_);
+    }
+  }
+  wall_instance_count_ = static_cast<uint32_t>(visible.size());
+
+  visible.clear();
+  visible.reserve(floor_tiles_cpu_.size());
+  for (const auto &tile_xy : floor_tiles_cpu_) {
+    const glm::vec3 box_min(tile_xy.x * tile, -0.1f, tile_xy.y * tile);
+    const glm::vec3 box_max((tile_xy.x + 1.0f) * tile, 0.1f,
+                            (tile_xy.y + 1.0f) * tile);
+    if (BoxInFrustum(box_min, box_max, planes)) {
+      visible.push_back(tile_xy);
+    }
+  }
+  if (!visible.empty() && floor_tile_memory_ != VK_NULL_HANDLE) {
+    void *mapped = nullptr;
+    const VkDeviceSize size = visible.size() * sizeof(glm::vec2);
+    if (vkMapMemory(device_, floor_tile_memory_, 0, size, 0, &mapped) ==
+            VK_SUCCESS &&
+        mapped != nullptr) {
+      std::memcpy(mapped, visible.data(), static_cast<std::size_t>(size));
+      vkUnmapMemory(device_, floor_tile_memory_);
+    }
+  }
+  floor_instance_count_ = static_cast<uint32_t>(visible.size());
+
+  UpdateMinimapCulling(planes);
+}
+
 // Record and submit one frame with instanced wall and floor draws,
 // plus the minimap overlay when requested.
 // - `camera` - Camera used for the view matrix.
@@ -121,12 +280,14 @@ void Renderer::Draw(const Camera &camera, float aspect,
   if (device_ == VK_NULL_HANDLE || swapchain_ == VK_NULL_HANDLE) {
     return;
   }
-  if (wall_instance_count_ == 0 && floor_instance_count_ == 0) {
+  if (wall_tiles_cpu_.empty() && floor_tiles_cpu_.empty()) {
     return;
   }
 
-  vkWaitForFences(device_, 1, &in_flight_[current_frame_], VK_TRUE,
-                  std::numeric_limits<uint64_t>::max());
+  CullTilesToFrustum(camera, aspect);
+  if (wall_instance_count_ == 0 && floor_instance_count_ == 0) {
+    return;
+  }
 
   uint32_t image_index = 0;
   VkResult acquire = vkAcquireNextImageKHR(
@@ -249,6 +410,8 @@ void Renderer::Destroy() noexcept {
   DestroyTileBuffer(floor_tile_buffer_, floor_tile_memory_);
   wall_instance_count_ = 0;
   floor_instance_count_ = 0;
+  wall_tiles_cpu_.clear();
+  floor_tiles_cpu_.clear();
 
   for (std::size_t i = 0; i < uniform_buffers_.size(); ++i) {
     if (uniform_mapped_[i] != nullptr) {

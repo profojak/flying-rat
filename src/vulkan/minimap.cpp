@@ -155,12 +155,18 @@ void Renderer::BuildMinimapBuffer(const Maze &maze) {
   minimap_exit_ = maze.Exit();
 
   std::vector<std::uint32_t> cells;
+  minimap_cells_cpu_.clear();
   if (minimap_grid_.x > 0 && minimap_grid_.y > 0) {
     cells.reserve(static_cast<std::size_t>(minimap_grid_.x) *
                   static_cast<std::size_t>(minimap_grid_.y));
+    minimap_cells_cpu_.reserve(static_cast<std::size_t>(minimap_grid_.x) *
+                               static_cast<std::size_t>(minimap_grid_.y));
     for (int y = 0; y < minimap_grid_.y; ++y) {
       for (int x = 0; x < minimap_grid_.x; ++x) {
-        cells.push_back(maze.At(x, y) == Tile::Wall ? 0u : 1u);
+        const auto base = maze.At(x, y) == Tile::Wall ? 0u : 1u;
+        minimap_cells_cpu_.push_back(base);
+        // Start culled; first `CullTilesToFrustum` refreshes visibility.
+        cells.push_back(base);
       }
     }
   }
@@ -195,6 +201,7 @@ void Renderer::DestroyMinimapBuffer() {
   minimap_grid_ = {0, 0};
   minimap_start_ = {0, 0};
   minimap_exit_ = {0, 0};
+  minimap_cells_cpu_.clear();
 }
 
 // Point minimap descriptor sets at the current cell buffer.
