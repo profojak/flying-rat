@@ -17,6 +17,9 @@ ConstantBuffer<FrameUniforms> frame;
 [[vk::binding(1, 0)]]
 StructuredBuffer<float2> tiles;
 
+[[vk::binding(2, 0)]]
+Sampler2D wall_texture;
+
 struct PushConstants {
   // Tile size in world units.
   float tile_size;
@@ -97,7 +100,8 @@ VSOutput VertexMain(uint vertexID : SV_VertexID,
   output.position = mul(frame.view_projection, float4(world, 1.0f));
   output.world_normal = SideNormal(face);
 
-  output.uv = float2(float(corner & 1u), (corner >= 2) ? 1.0f : 0.0f);
+  output.uv = float2(((corner == 1u || corner == 2u) ? 1.0f : 0.0f),
+                     (corner >= 2) ? 1.0f : 0.0f);
   return output;
 }
 
@@ -106,6 +110,6 @@ VSOutput VertexMain(uint vertexID : SV_VertexID,
 float4 FragmentMain(VSOutput input) : SV_Target {
   float3 n = normalize(input.world_normal);
   float diffuse = max(dot(n, -normalize(frame.light_direction)), 0.0f);
-  float3 albedo = float3(0.7f, 0.7f, 0.75f);
+  float3 albedo = wall_texture.Sample(float2(input.uv.x, 1.0f - input.uv.y)).rgb;
   return float4(albedo * (frame.ambient + diffuse), 1.0f);
 }

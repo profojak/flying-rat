@@ -83,7 +83,8 @@ VSOutput VertexMain(uint vertexID : SV_VertexID,
   output.position = mul(frame.view_projection, float4(world, 1.0f));
   output.world_normal = FloorNormal();
 
-  output.uv = float2(float(corner & 1u), (corner >= 2) ? 1.0f : 0.0f);
+  output.uv = float2(((corner == 1u || corner == 2u) ? 1.0f : 0.0f),
+                     (corner >= 2) ? 1.0f : 0.0f);
   return output;
 }
 
@@ -92,6 +93,6 @@ VSOutput VertexMain(uint vertexID : SV_VertexID,
 float4 FragmentMain(VSOutput input) : SV_Target {
   float3 n = normalize(input.world_normal);
   float diffuse = max(dot(n, -normalize(frame.light_direction)), 0.0f);
-  float3 albedo = float3(0.7f, 0.7f, 0.75f);
+  float3 albedo = float3(0.36f, 0.38f, 0.21f);
   return float4(albedo * (frame.ambient + diffuse), 1.0f);
 }

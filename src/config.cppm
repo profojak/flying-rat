@@ -37,7 +37,7 @@ inline constexpr glm::vec3 light_direction{-0.6f, -1.0f, -0.4f};
 inline constexpr float ambient_strength = 0.35f;
 
 // Clear color (RGBA).
-inline constexpr glm::vec4 clear_color{0.08f, 0.09f, 0.11f, 1.0f};
+inline constexpr glm::vec4 clear_color{0.32f, 0.49f, 0.55f, 1.0f};
 
 // Maze room carving.
 inline constexpr int room_attempts = 20;
