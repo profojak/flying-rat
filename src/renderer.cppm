@@ -217,6 +217,8 @@ public:
   Renderer() = default;
   Renderer(const Renderer &) = delete;
   Renderer &operator=(const Renderer &) = delete;
+  Renderer(Renderer &&) = delete;
+  Renderer &operator=(Renderer &&) = delete;
   ~Renderer() { Destroy(); }
 
   // Create `VkInstance`, pick a physical device, create the logical device,
@@ -243,7 +245,7 @@ public:
   void WaitIdle();
 
   // Destroy Vulkan resources.
-  void Destroy();
+  void Destroy() noexcept;
 
 private:
   // Create Vulkan instance.

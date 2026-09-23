@@ -204,7 +204,7 @@ void Renderer::WaitIdle() {
 }
 
 // Destroy Vulkan resources.
-void Renderer::Destroy() {
+void Renderer::Destroy() noexcept {
   if (device_ != VK_NULL_HANDLE) {
     vkDeviceWaitIdle(device_);
   }

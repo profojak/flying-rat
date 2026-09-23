@@ -52,6 +52,8 @@ public:
   App() = default;
   App(const App &) = delete;
   App &operator=(const App &) = delete;
+  App(App &&) = delete;
+  App &operator=(App &&) = delete;
   ~App() { Destroy(); }
 
   // Run the application.
@@ -77,7 +79,6 @@ public:
 
     renderer_.WaitIdle();
 
-    Destroy();
     return 0;
   }
 
@@ -194,7 +195,7 @@ private:
   }
 
   // Shut down the application and clean up resources.
-  void Destroy() {
+  void Destroy() noexcept {
     renderer_.Destroy();
     if (window_ != nullptr) {
       glfwDestroyWindow(window_);
