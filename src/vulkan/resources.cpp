@@ -102,19 +102,22 @@ bool Renderer::CreateTileBuffersEmpty() {
 // Return true on success, false on failure.
 bool Renderer::CreateDescriptorPool() {
   constexpr std::uint32_t sets_per_frame = 3;
-  VkDescriptorPoolSize sizes[2]{};
+  VkDescriptorPoolSize sizes[3]{};
   sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   sizes[0].descriptorCount =
       static_cast<std::uint32_t>(max_frames_in_flight_ * sets_per_frame);
   sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
   sizes[1].descriptorCount =
       static_cast<std::uint32_t>(max_frames_in_flight_ * sets_per_frame);
+  sizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  sizes[2].descriptorCount =
+      static_cast<std::uint32_t>(max_frames_in_flight_ * sets_per_frame);
 
   VkDescriptorPoolCreateInfo info{};
   info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   info.maxSets =
       static_cast<std::uint32_t>(max_frames_in_flight_ * sets_per_frame);
-  info.poolSizeCount = 2;
+  info.poolSizeCount = 3;
   info.pPoolSizes = sizes;
 
   if (vkCreateDescriptorPool(device_, &info, nullptr, &descriptor_pool_) !=
@@ -159,7 +162,9 @@ bool Renderer::AllocateDescriptorSets() {
   return true;
 }
 
-// Point wall and floor descriptor sets at the current buffers.
+// Point wall and floor descriptor sets at the current buffers and the wall
+// texture.  Floor sets share the layout and the texture slot even though
+// the floor shader leaves binding 2 unused.
 void Renderer::UpdateDescriptors() {
   if (descriptor_pool_ == VK_NULL_HANDLE) {
     return;
@@ -180,7 +185,14 @@ void Renderer::UpdateDescriptors() {
     wall_info.offset = 0;
     wall_info.range = wall_size;
 
-    VkWriteDescriptorSet wall_writes[2]{};
+    VkDescriptorImageInfo texture_info{};
+    texture_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    texture_info.imageView = wall_image_view_;
+    texture_info.sampler = wall_sampler_;
+    const bool has_texture =
+        wall_image_view_ != VK_NULL_HANDLE && wall_sampler_ != VK_NULL_HANDLE;
+
+    VkWriteDescriptorSet wall_writes[3]{};
     wall_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     wall_writes[0].dstSet = wall_sets_[i];
     wall_writes[0].dstBinding = 0;
@@ -193,14 +205,21 @@ void Renderer::UpdateDescriptors() {
     wall_writes[1].descriptorCount = 1;
     wall_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     wall_writes[1].pBufferInfo = &wall_info;
-    vkUpdateDescriptorSets(device_, 2, wall_writes, 0, nullptr);
+    wall_writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    wall_writes[2].dstSet = wall_sets_[i];
+    wall_writes[2].dstBinding = 2;
+    wall_writes[2].descriptorCount = 1;
+    wall_writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    wall_writes[2].pImageInfo = &texture_info;
+    vkUpdateDescriptorSets(device_, has_texture ? 3u : 2u, wall_writes, 0,
+                           nullptr);
 
     VkDescriptorBufferInfo floor_info{};
     floor_info.buffer = floor_tile_buffer_;
     floor_info.offset = 0;
     floor_info.range = floor_size;
 
-    VkWriteDescriptorSet floor_writes[2]{};
+    VkWriteDescriptorSet floor_writes[3]{};
     floor_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     floor_writes[0].dstSet = floor_sets_[i];
     floor_writes[0].dstBinding = 0;
@@ -213,7 +232,14 @@ void Renderer::UpdateDescriptors() {
     floor_writes[1].descriptorCount = 1;
     floor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     floor_writes[1].pBufferInfo = &floor_info;
-    vkUpdateDescriptorSets(device_, 2, floor_writes, 0, nullptr);
+    floor_writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    floor_writes[2].dstSet = floor_sets_[i];
+    floor_writes[2].dstBinding = 2;
+    floor_writes[2].descriptorCount = 1;
+    floor_writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    floor_writes[2].pImageInfo = &texture_info;
+    vkUpdateDescriptorSets(device_, has_texture ? 3u : 2u, floor_writes, 0,
+                           nullptr);
   }
 }
 
@@ -311,7 +337,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t image_index,
 
   VkClearValue clear[2]{};
   clear[0].color = {{config::clear_color.r, config::clear_color.g,
-                       config::clear_color.b, config::clear_color.a}};
+                     config::clear_color.b, config::clear_color.a}};
   clear[1].depthStencil = {1.0f, 0};
 
   VkRenderPassBeginInfo pass{};

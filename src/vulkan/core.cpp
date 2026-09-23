@@ -63,7 +63,10 @@ bool Renderer::Initialize(GLFWwindow *window) {
     return false;
   if (!AllocateDescriptorSets())
     return false;
+  if (!CreateWallTexture())
+    return false;
   UpdateDescriptors();
+  UpdateMinimapDescriptors();
   if (!CreateCommandPool())
     return false;
   if (!CreateCommandBuffers())
@@ -404,6 +407,7 @@ void Renderer::Destroy() noexcept {
   floor_sets_.clear();
   minimap_sets_.clear();
 
+  DestroyWallTexture();
   DestroyMinimapBuffer();
 
   DestroyTileBuffer(wall_tile_buffer_, wall_tile_memory_);

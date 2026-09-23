@@ -231,7 +231,14 @@ void Renderer::UpdateMinimapDescriptors() {
     cells_info.offset = 0;
     cells_info.range = range;
 
-    VkWriteDescriptorSet writes[2]{};
+    VkDescriptorImageInfo texture_info{};
+    texture_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    texture_info.imageView = wall_image_view_;
+    texture_info.sampler = wall_sampler_;
+    const bool has_texture =
+        wall_image_view_ != VK_NULL_HANDLE && wall_sampler_ != VK_NULL_HANDLE;
+
+    VkWriteDescriptorSet writes[3]{};
     writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     writes[0].dstSet = minimap_sets_[i];
     writes[0].dstBinding = 0;
@@ -244,7 +251,13 @@ void Renderer::UpdateMinimapDescriptors() {
     writes[1].descriptorCount = 1;
     writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     writes[1].pBufferInfo = &cells_info;
-    vkUpdateDescriptorSets(device_, 2, writes, 0, nullptr);
+    writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[2].dstSet = minimap_sets_[i];
+    writes[2].dstBinding = 2;
+    writes[2].descriptorCount = 1;
+    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[2].pImageInfo = &texture_info;
+    vkUpdateDescriptorSets(device_, has_texture ? 3u : 2u, writes, 0, nullptr);
   }
 }
 

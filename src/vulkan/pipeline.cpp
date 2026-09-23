@@ -56,8 +56,7 @@ Renderer::ReadFile(const std::filesystem::path &path) {
 // Resolve a shader file, trying the CMake SPIR-V directory first.
 // - `filename` - Shader file name.
 // Return the existing path, empty when not found.
-std::filesystem::path
-Renderer::FindShaderFile(const char *filename) {
+std::filesystem::path Renderer::FindShaderFile(const char *filename) {
   std::vector<std::filesystem::path> candidates;
   if (const char *env = std::getenv("SHADER_DIR")) {
     candidates.emplace_back(std::filesystem::path(env) / filename);
@@ -180,7 +179,7 @@ VkFormat Renderer::FindDepthFormat() {
   return VK_FORMAT_D32_SFLOAT;
 }
 
-// Create the descriptor set layout shared by both pipelines.
+// Create the descriptor set layout shared by all pipelines.
 // Return true on success, false on failure.
 bool Renderer::CreateDescriptorSetLayout() {
   VkDescriptorSetLayoutBinding ubo{};
@@ -195,10 +194,16 @@ bool Renderer::CreateDescriptorSetLayout() {
   tiles.descriptorCount = 1;
   tiles.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-  VkDescriptorSetLayoutBinding bindings[] = {ubo, tiles};
+  VkDescriptorSetLayoutBinding wall_texture{};
+  wall_texture.binding = 2;
+  wall_texture.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  wall_texture.descriptorCount = 1;
+  wall_texture.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+  VkDescriptorSetLayoutBinding bindings[] = {ubo, tiles, wall_texture};
   VkDescriptorSetLayoutCreateInfo info{};
   info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  info.bindingCount = 2;
+  info.bindingCount = 3;
   info.pBindings = bindings;
 
   if (vkCreateDescriptorSetLayout(device_, &info, nullptr,

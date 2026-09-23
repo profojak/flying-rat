@@ -178,7 +178,7 @@ private:
   // Minimap exit tile, cached from `BuildMaze`.
   glm::ivec2 minimap_exit_{0, 0};
 
-  // Descriptor pool holding wall and floor sets for all frames.
+  // Descriptor pool holding wall, floor, and minimap sets for all frames.
   VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
   // Wall descriptor sets, one per in-flight frame.
   std::vector<VkDescriptorSet> wall_sets_;
@@ -186,6 +186,15 @@ private:
   std::vector<VkDescriptorSet> floor_sets_;
   // Minimap descriptor sets, one per in-flight frame.
   std::vector<VkDescriptorSet> minimap_sets_;
+
+  // Wall texture image loaded from `data/wall.jpg`.
+  VkImage wall_image_ = VK_NULL_HANDLE;
+  // Wall texture image memory.
+  VkDeviceMemory wall_image_memory_ = VK_NULL_HANDLE;
+  // Wall texture image view.
+  VkImageView wall_image_view_ = VK_NULL_HANDLE;
+  // Wall texture sampler.
+  VkSampler wall_sampler_ = VK_NULL_HANDLE;
 
   // Image-available semaphores, one per in-flight frame.
   std::vector<VkSemaphore> image_available_;
@@ -491,6 +500,55 @@ private:
   // - `minimap` - Minimap overlay request for this frame.
   void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t image_index,
                            std::size_t frame, const MinimapArgs &minimap);
+
+  // Resolve the wall texture file.
+  // - `filename` - Texture file name.
+  // Return the existing path, empty when not found.
+  [[nodiscard]] static std::filesystem::path
+  FindTextureFile(const char *filename);
+
+  // Load `data/wall.jpg` into a sampled image with view and sampler.
+  // Return true on success, false on failure.
+  bool CreateWallTexture();
+
+  // Destroy the wall texture image, view, and sampler.
+  void DestroyWallTexture();
+
+  // Create an image and allocate bound memory.
+  // - `width`, `height` - Image extent in texels.
+  // - `format` - Image format, normally sRGB RGBA8 for the wall texture.
+  // - `tiling` - Image tiling, normally optimal.
+  // - `usage` - Image usage flags.
+  // - `properties` - Required memory properties.
+  // - `image`, `memory` - Created image and memory.
+  // Return true on success, false on failure.
+  bool CreateImage(uint32_t width, uint32_t height, VkFormat format,
+                   VkImageTiling tiling, VkImageUsageFlags usage,
+                   VkMemoryPropertyFlags properties, VkImage &image,
+                   VkDeviceMemory &memory);
+
+  // Transition an image layout with a one-time command buffer.
+  // - `image` - Image to transition.
+  // - `old_layout`, `new_layout` - Layouts to transition between.
+  void TransitionImageLayout(VkImage image, VkImageLayout old_layout,
+                             VkImageLayout new_layout);
+
+  // Copy a staging buffer into an image.
+  // - `buffer` - Staging buffer holding tightly packed RGBA8 texels.
+  // - `image` - Destination image in transfer-dst-optimal layout.
+  // - `width`, `height` - Image extent in texels.
+  void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width,
+                         uint32_t height);
+
+  // Begin one-time commands on a transient pool.
+  // - `pool` - Receives the transient command pool.
+  // Return the command buffer, or `VK_NULL_HANDLE` on failure.
+  [[nodiscard]] VkCommandBuffer BeginSingleTimeCommands(VkCommandPool &pool);
+
+  // Submit one-time commands and destroy the transient pool.
+  // - `cmd` - Command buffer from `BeginSingleTimeCommands`.
+  // - `pool` - Transient command pool to submit on and destroy.
+  void EndSingleTimeCommands(VkCommandBuffer cmd, VkCommandPool pool);
 };
 
 } // namespace flying_rat

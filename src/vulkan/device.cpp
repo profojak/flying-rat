@@ -116,8 +116,7 @@ Renderer::FindQueueFamilies(VkPhysicalDevice device) {
 // Check that a physical device supports the required device extensions.
 // - `device` - Physical device to inspect.
 // Return true when `VK_KHR_swapchain` is available.
-bool
-Renderer::CheckDeviceExtensionSupport(VkPhysicalDevice device) {
+bool Renderer::CheckDeviceExtensionSupport(VkPhysicalDevice device) {
   uint32_t count = 0;
   vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr);
   std::vector<VkExtensionProperties> available(count);
@@ -208,10 +207,9 @@ bool Renderer::PickPhysicalDevice() {
 // Return true on success, false on failure.
 bool Renderer::CreateLogicalDevice() {
   std::array<std::uint32_t, 2> families = {graphics_queue_family_,
-                                            present_queue_family_};
+                                           present_queue_family_};
   std::ranges::sort(families);
-  std::size_t family_count =
-      (families[0] == families[1]) ? 1 : families.size();
+  std::size_t family_count = (families[0] == families[1]) ? 1 : families.size();
 
   float priority = 1.0f;
   std::vector<VkDeviceQueueCreateInfo> queue_infos;
@@ -226,7 +224,11 @@ bool Renderer::CreateLogicalDevice() {
     queue_infos.push_back(queue_info);
   }
 
+  VkPhysicalDeviceFeatures supported{};
+  vkGetPhysicalDeviceFeatures(physical_device_, &supported);
   VkPhysicalDeviceFeatures features{};
+  features.samplerAnisotropy =
+      (supported.samplerAnisotropy == VK_TRUE) ? VK_TRUE : VK_FALSE;
 
   // Query support for shader `DrawParameters` and enable it.
   VkPhysicalDeviceVulkan11Features query11{};
@@ -420,8 +422,8 @@ bool Renderer::CreateImageViews() {
 // - `filter` - Bitmask of suitable memory types.
 // - `properties` - Required memory property flags.
 // Return the memory type index, or `UINT32_MAX` when none matches.
-uint32_t
-Renderer::FindMemoryType(uint32_t filter, VkMemoryPropertyFlags properties) {
+uint32_t Renderer::FindMemoryType(uint32_t filter,
+                                  VkMemoryPropertyFlags properties) {
   VkPhysicalDeviceMemoryProperties mem{};
   vkGetPhysicalDeviceMemoryProperties(physical_device_, &mem);
   for (uint32_t i = 0; i < mem.memoryTypeCount; ++i) {
