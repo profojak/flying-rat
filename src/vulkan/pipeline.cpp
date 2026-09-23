@@ -27,7 +27,7 @@ namespace flying_rat {
 // Read a whole binary file.
 // - `path` - File to read.
 // Return file bytes, empty on failure.
-[[nodiscard]] std::vector<std::uint32_t>
+std::vector<std::uint32_t>
 Renderer::ReadFile(const std::filesystem::path &path) {
   std::ifstream file(path, std::ios::ate | std::ios::binary);
   if (!file.is_open()) {
@@ -55,7 +55,7 @@ Renderer::ReadFile(const std::filesystem::path &path) {
 // Resolve a shader file, trying the CMake SPIR-V directory first.
 // - `filename` - Shader file name.
 // Return the existing path, empty when not found.
-[[nodiscard]] std::filesystem::path
+std::filesystem::path
 Renderer::FindShaderFile(const char *filename) {
   std::vector<std::filesystem::path> candidates;
   if (const char *env = std::getenv("SHADER_DIR")) {
@@ -76,7 +76,7 @@ Renderer::FindShaderFile(const char *filename) {
 // Create a shader module from SPIR-V code.
 // - `code` - SPIR-V bytes.
 // Return the module, or `VK_NULL_HANDLE` on failure.
-[[nodiscard]] VkShaderModule
+VkShaderModule
 Renderer::CreateShaderModule(const std::vector<std::uint32_t> &code) {
   if (code.empty()) {
     std::println("[renderer] vkCreateShaderModule failed: empty SPIR-V");
@@ -162,7 +162,7 @@ bool Renderer::CreateRenderPass() {
 
 // Find a supported depth format, preferring 32-bit float.
 // Return the depth format.
-[[nodiscard]] VkFormat Renderer::FindDepthFormat() {
+VkFormat Renderer::FindDepthFormat() {
   const VkFormat candidates[] = {
       VK_FORMAT_D32_SFLOAT,
       VK_FORMAT_D32_SFLOAT_S8_UINT,

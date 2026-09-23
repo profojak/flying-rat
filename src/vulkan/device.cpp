@@ -90,7 +90,7 @@ bool Renderer::CreateSurface() {
 // Find graphics and present queue families for a physical device.
 // - `device` - Physical device to inspect.
 // Return queue family indices of the graphics and present queues.
-[[nodiscard]] Renderer::QueueFamilyIndices
+Renderer::QueueFamilyIndices
 Renderer::FindQueueFamilies(VkPhysicalDevice device) {
   QueueFamilyIndices indices;
   uint32_t count = 0;
@@ -116,7 +116,7 @@ Renderer::FindQueueFamilies(VkPhysicalDevice device) {
 // Check that a physical device supports the required device extensions.
 // - `device` - Physical device to inspect.
 // Return true when `VK_KHR_swapchain` is available.
-[[nodiscard]] bool
+bool
 Renderer::CheckDeviceExtensionSupport(VkPhysicalDevice device) {
   uint32_t count = 0;
   vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr);
@@ -134,7 +134,7 @@ Renderer::CheckDeviceExtensionSupport(VkPhysicalDevice device) {
 // Query swapchain support details for a physical device.
 // - `device` - Physical device to inspect.
 // Return swapchain support details.
-[[nodiscard]] Renderer::SwapchainSupport
+Renderer::SwapchainSupport
 Renderer::QuerySwapchainSupport(VkPhysicalDevice device) {
   SwapchainSupport support;
   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface_,
@@ -163,7 +163,7 @@ Renderer::QuerySwapchainSupport(VkPhysicalDevice device) {
 // Check that a physical device can present a swapchain to our surface.
 // - `device` - Physical device to inspect.
 // Return true when queues, extensions, and swapchain details are adequate.
-[[nodiscard]] bool Renderer::IsDeviceSuitable(VkPhysicalDevice device) {
+bool Renderer::IsDeviceSuitable(VkPhysicalDevice device) {
   if (!FindQueueFamilies(device).IsComplete()) {
     return false;
   }
@@ -280,7 +280,7 @@ bool Renderer::CreateLogicalDevice() {
 // Pick the swapchain surface format, preferring sRGB.
 // - `formats` - Formats supported by the surface.
 // Return the chosen surface format.
-[[nodiscard]] VkSurfaceFormatKHR Renderer::ChooseSwapSurfaceFormat(
+VkSurfaceFormatKHR Renderer::ChooseSwapSurfaceFormat(
     const std::vector<VkSurfaceFormatKHR> &formats) {
   for (const auto &format : formats) {
     if (format.format == VK_FORMAT_B8G8R8A8_SRGB &&
@@ -294,7 +294,7 @@ bool Renderer::CreateLogicalDevice() {
 // Pick the swapchain present mode, preferring mailbox.
 // - `modes` - Present modes supported by the surface.
 // Return the chosen present mode.
-[[nodiscard]] VkPresentModeKHR
+VkPresentModeKHR
 Renderer::ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> &modes) {
   for (auto mode : modes) {
     if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
@@ -307,7 +307,7 @@ Renderer::ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> &modes) {
 // Pick the swapchain extent, clamping the window size to the capabilities.
 // - `capabilities` - Surface capabilities of the physical device.
 // Return the chosen swapchain extent.
-[[nodiscard]] VkExtent2D
+VkExtent2D
 Renderer::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) {
   if (capabilities.currentExtent.width !=
       std::numeric_limits<uint32_t>::max()) {
@@ -416,7 +416,7 @@ bool Renderer::CreateImageViews() {
 // - `filter` - Bitmask of suitable memory types.
 // - `properties` - Required memory property flags.
 // Return the memory type index, or `UINT32_MAX` when none matches.
-[[nodiscard]] uint32_t
+uint32_t
 Renderer::FindMemoryType(uint32_t filter, VkMemoryPropertyFlags properties) {
   VkPhysicalDeviceMemoryProperties mem{};
   vkGetPhysicalDeviceMemoryProperties(physical_device_, &mem);

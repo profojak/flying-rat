@@ -244,7 +244,7 @@ void Renderer::UpdateMinimapDescriptors() {
 // Compute minimap push constants for one frame.
 // - `minimap` - Minimap overlay request for this frame.
 // Return push constants positioning a centered overlay.
-[[nodiscard]] Renderer::MinimapPushConstants
+Renderer::MinimapPushConstants
 Renderer::PushForMinimap(const MinimapArgs &minimap) const {
   MinimapPushConstants push{};
   if (minimap_grid_.x <= 0 || minimap_grid_.y <= 0) {
