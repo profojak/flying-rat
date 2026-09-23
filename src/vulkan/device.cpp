@@ -8,13 +8,13 @@ module;
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <optional>
 #include <print>
-#include <set>
 #include <vector>
 
 module flying_rat.renderer;
@@ -207,13 +207,17 @@ bool Renderer::PickPhysicalDevice() {
 // Create logical device with graphics and present queues.
 // Return true on success, false on failure.
 bool Renderer::CreateLogicalDevice() {
-  std::set<uint32_t> unique_families = {graphics_queue_family_,
-                                        present_queue_family_};
+  std::array<std::uint32_t, 2> families = {graphics_queue_family_,
+                                            present_queue_family_};
+  std::ranges::sort(families);
+  std::size_t family_count =
+      (families[0] == families[1]) ? 1 : families.size();
 
   float priority = 1.0f;
   std::vector<VkDeviceQueueCreateInfo> queue_infos;
-  queue_infos.reserve(unique_families.size());
-  for (auto family : unique_families) {
+  queue_infos.reserve(family_count);
+  for (std::size_t i = 0; i < family_count; ++i) {
+    auto family = families[i];
     VkDeviceQueueCreateInfo queue_info{};
     queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queue_info.queueFamilyIndex = family;

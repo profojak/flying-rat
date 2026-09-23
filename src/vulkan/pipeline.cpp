@@ -7,6 +7,7 @@ module;
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -257,9 +258,8 @@ bool Renderer::CreateGraphicsPipelines() {
   VkPushConstantRange push{};
   push.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
   push.offset = 0;
-  push.size = sizeof(PushConstants) > sizeof(MinimapPushConstants)
-                  ? sizeof(PushConstants)
-                  : sizeof(MinimapPushConstants);
+  push.size = static_cast<std::uint32_t>(
+      std::max(sizeof(PushConstants), sizeof(MinimapPushConstants)));
 
   VkPipelineLayoutCreateInfo layout_info{};
   layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;

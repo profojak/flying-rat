@@ -6,6 +6,7 @@ module;
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cstdint>
 #include <random>
 #include <utility>
@@ -72,10 +73,12 @@ public:
     return tiles_[index] == Tile::Wall;
   }
 
-  // Tile accessor.
+  // Tile accessor, unchecked for speed on the hot path.
   // - `x`, `y` - Coordinates of the tile.
   template <typename Self>
   [[nodiscard]] decltype(auto) At(this Self &&self, int x, int y) noexcept {
+    assert(x >= 0 && y >= 0 && x < self.size_.x && y < self.size_.y);
+    [[assume(x >= 0 && y >= 0 && x < self.size_.x && y < self.size_.y)]];
     auto index =
         static_cast<std::size_t>(y) * static_cast<std::size_t>(self.size_.x) +
         static_cast<std::size_t>(x);

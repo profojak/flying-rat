@@ -73,7 +73,7 @@ public:
   }
 
   // Return the camera for rendering.
-  [[nodiscard]] const ::flying_rat::Camera &GetCamera() const noexcept {
+  [[nodiscard]] const Camera &GetCamera() const noexcept {
     return camera_;
   }
 
