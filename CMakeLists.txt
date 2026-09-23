@@ -14,14 +14,7 @@ project(flying-rat
 find_package(glfw3 REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(glm REQUIRED)
-
-# Slang ships no CMake package, wrap it.
-find_path(SLANG_INCLUDE_DIR NAMES slang.h REQUIRED)
-find_library(SLANG_LIBRARY NAMES slang REQUIRED)
-add_library(Slang::Slang UNKNOWN IMPORTED)
-set_target_properties(Slang::Slang PROPERTIES
-    IMPORTED_LOCATION "${SLANG_LIBRARY}"
-    INTERFACE_INCLUDE_DIRECTORIES "${SLANG_INCLUDE_DIR}")
+find_program(SLANGC NAMES slangc REQUIRED)
 
 add_executable(flying-rat)
 
@@ -33,8 +26,53 @@ target_sources(flying-rat
         FILES
             src/app.cppm)
 
-target_link_libraries(flying-rat PRIVATE
-    glfw
-    Vulkan::Vulkan
-    glm::glm
-    Slang::Slang)
+target_link_libraries(flying-rat PRIVATE glfw Vulkan::Vulkan glm::glm)
+
+# Compile .slang to SPIR-V.
+set(SHADERS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/data)
+set(SPIRV_DIR ${CMAKE_CURRENT_BINARY_DIR})
+
+add_custom_command(
+    OUTPUT ${SPIRV_DIR}/wall.vert.spv
+    COMMAND ${SLANGC} ${SHADERS_DIR}/wall.slang
+        -target spirv
+        -entry VertexMain -stage vertex
+        -o ${SPIRV_DIR}/wall.vert.spv
+    DEPENDS ${SHADERS_DIR}/wall.slang
+    VERBATIM)
+
+add_custom_command(
+    OUTPUT ${SPIRV_DIR}/wall.frag.spv
+    COMMAND ${SLANGC} ${SHADERS_DIR}/wall.slang
+        -target spirv
+        -entry FragmentMain -stage fragment
+        -o ${SPIRV_DIR}/wall.frag.spv
+    DEPENDS ${SHADERS_DIR}/wall.slang
+    VERBATIM)
+
+add_custom_command(
+    OUTPUT ${SPIRV_DIR}/floor.vert.spv
+    COMMAND ${SLANGC} ${SHADERS_DIR}/floor.slang
+        -target spirv
+        -entry VertexMain -stage vertex
+        -o ${SPIRV_DIR}/floor.vert.spv
+    DEPENDS ${SHADERS_DIR}/floor.slang
+    VERBATIM)
+
+add_custom_command(
+    OUTPUT ${SPIRV_DIR}/floor.frag.spv
+    COMMAND ${SLANGC} ${SHADERS_DIR}/floor.slang
+        -target spirv
+        -entry FragmentMain -stage fragment
+        -o ${SPIRV_DIR}/floor.frag.spv
+    DEPENDS ${SHADERS_DIR}/floor.slang
+    VERBATIM)
+
+add_custom_target(shaders ALL
+    DEPENDS
+        ${SPIRV_DIR}/wall.vert.spv
+        ${SPIRV_DIR}/wall.frag.spv
+        ${SPIRV_DIR}/floor.vert.spv
+        ${SPIRV_DIR}/floor.frag.spv)
+
+add_dependencies(flying-rat shaders)
