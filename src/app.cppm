@@ -157,7 +157,6 @@ private:
       int minimap_key = glfwGetKey(window_, GLFW_KEY_M);
       if (minimap_key == GLFW_PRESS && minimap_key_prev_ == GLFW_RELEASE) {
         show_minimap_ = !show_minimap_;
-        std::println("[app] minimap {}", show_minimap_ ? "on" : "off");
       }
       minimap_key_prev_ = minimap_key;
 
