@@ -98,18 +98,22 @@ bool Renderer::CreateTileBuffersEmpty() {
          floor_tile_buffer_ != VK_NULL_HANDLE;
 }
 
-// Create the descriptor pool for wall and floor sets.
+// Create the descriptor pool for wall, floor, and minimap sets.
 // Return true on success, false on failure.
 bool Renderer::CreateDescriptorPool() {
+  constexpr std::uint32_t sets_per_frame = 3;
   VkDescriptorPoolSize sizes[2]{};
   sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  sizes[0].descriptorCount = static_cast<uint32_t>(max_frames_in_flight_ * 2);
+  sizes[0].descriptorCount =
+      static_cast<std::uint32_t>(max_frames_in_flight_ * sets_per_frame);
   sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  sizes[1].descriptorCount = static_cast<uint32_t>(max_frames_in_flight_ * 2);
+  sizes[1].descriptorCount =
+      static_cast<std::uint32_t>(max_frames_in_flight_ * sets_per_frame);
 
   VkDescriptorPoolCreateInfo info{};
   info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  info.maxSets = static_cast<uint32_t>(max_frames_in_flight_ * 2);
+  info.maxSets =
+      static_cast<std::uint32_t>(max_frames_in_flight_ * sets_per_frame);
   info.poolSizeCount = 2;
   info.pPoolSizes = sizes;
 
@@ -121,11 +125,13 @@ bool Renderer::CreateDescriptorPool() {
   return true;
 }
 
-// Allocate wall and floor descriptor sets, one per in-flight frame.
+// Allocate wall, floor, and minimap descriptor sets, one per in-flight
+// frame.
 // Return true on success, false on failure.
 bool Renderer::AllocateDescriptorSets() {
   wall_sets_.resize(max_frames_in_flight_);
   floor_sets_.resize(max_frames_in_flight_);
+  minimap_sets_.resize(max_frames_in_flight_);
 
   std::vector<VkDescriptorSetLayout> layouts(max_frames_in_flight_,
                                              descriptor_set_layout_);
@@ -143,6 +149,11 @@ bool Renderer::AllocateDescriptorSets() {
   if (vkAllocateDescriptorSets(device_, &info, floor_sets_.data()) !=
       VK_SUCCESS) {
     std::println("[renderer] failed to allocate floor descriptor sets");
+    return false;
+  }
+  if (vkAllocateDescriptorSets(device_, &info, minimap_sets_.data()) !=
+      VK_SUCCESS) {
+    std::println("[renderer] failed to allocate minimap descriptor sets");
     return false;
   }
   return true;
@@ -286,12 +297,14 @@ void Renderer::UpdateUniformBuffer(std::size_t frame, const Camera &camera,
   std::memcpy(uniform_mapped_[frame], &uniforms, sizeof(uniforms));
 }
 
-// Record wall and floor instanced draws into a command buffer.
+// Record wall, floor, and minimap draws into a command buffer.
 // - `cmd` - Command buffer to record.
 // - `image_index` - Swapchain image (framebuffer) index.
 // - `frame` - In-flight frame index selecting the descriptor sets.
+// - `minimap` - Minimap overlay request for this frame.
 void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t image_index,
-                                   std::size_t frame) {
+                                   std::size_t frame,
+                                   const MinimapArgs &minimap) {
   VkCommandBufferBeginInfo begin{};
   begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   vkBeginCommandBuffer(cmd, &begin);
@@ -349,6 +362,8 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t image_index,
     // Procedural floor quad: 6 vertices per floor tile instance.
     vkCmdDraw(cmd, floor_vertices_, floor_instance_count_, 0, 0);
   }
+
+  RecordMinimap(cmd, frame, minimap);
 
   vkCmdEndRenderPass(cmd);
   vkEndCommandBuffer(cmd);

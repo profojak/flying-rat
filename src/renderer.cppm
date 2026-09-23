@@ -22,6 +22,14 @@ import flying_rat.maze;
 
 namespace flying_rat {
 
+// Minimap overlay request for one frame.
+export struct MinimapArgs {
+  // True when the minimap should be drawn.
+  bool visible = false;
+  // Player tile coordinates.
+  glm::ivec2 player_cell{0, 0};
+};
+
 // Vulkan renderer.
 // NOTE: No other code deals with Vulkan API directly.
 export class Renderer {
@@ -65,6 +73,8 @@ private:
   VkPipeline wall_pipeline_ = VK_NULL_HANDLE;
   // Floor graphics pipeline.
   VkPipeline floor_pipeline_ = VK_NULL_HANDLE;
+  // Minimap overlay pipeline.
+  VkPipeline minimap_pipeline_ = VK_NULL_HANDLE;
   // Framebuffers, one per swapchain image.
   std::vector<VkFramebuffer> framebuffers_;
   // Command pool for frame command buffers.
@@ -106,6 +116,28 @@ private:
 
   static_assert(sizeof(PushConstants) == 8);
 
+  // Push constants for the minimap overlay.
+  // NOTE: Must match `MinimapPush` in `data/minimap.slang`.
+  struct MinimapPushConstants {
+    // Top-left corner of the grid area in NDC.
+    glm::vec2 origin{};
+    // Size of one cell in NDC.
+    glm::vec2 cell{};
+    // Maze dimensions in tiles.
+    glm::ivec2 grid{0, 0};
+    // Player tile coordinates.
+    glm::ivec2 player{0, 0};
+    // Start tile coordinates.
+    glm::ivec2 start{0, 0};
+    // Exit tile coordinates.
+    glm::ivec2 exit{0, 0};
+  };
+
+  static_assert(sizeof(MinimapPushConstants) == 48);
+  static_assert(offsetof(MinimapPushConstants, grid) == 16);
+  static_assert(offsetof(MinimapPushConstants, start) == 32);
+  static_assert(offsetof(MinimapPushConstants, exit) == 40);
+
   // Uniform buffers, one per in-flight frame.
   std::vector<VkBuffer> uniform_buffers_;
   // Uniform buffer memories.
@@ -125,6 +157,16 @@ private:
   uint32_t wall_instance_count_ = 0;
   // Number of floor instances.
   uint32_t floor_instance_count_ = 0;
+  // Minimap cell type buffer, one uint per maze tile, row-major.
+  VkBuffer minimap_buffer_ = VK_NULL_HANDLE;
+  // Minimap buffer memory.
+  VkDeviceMemory minimap_memory_ = VK_NULL_HANDLE;
+  // Minimap grid dimensions in tiles, cached from `BuildMaze`.
+  glm::ivec2 minimap_grid_{0, 0};
+  // Minimap start tile, cached from `BuildMaze`.
+  glm::ivec2 minimap_start_{0, 0};
+  // Minimap exit tile, cached from `BuildMaze`.
+  glm::ivec2 minimap_exit_{0, 0};
 
   // Descriptor pool holding wall and floor sets for all frames.
   VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
@@ -132,6 +174,8 @@ private:
   std::vector<VkDescriptorSet> wall_sets_;
   // Floor descriptor sets, one per in-flight frame.
   std::vector<VkDescriptorSet> floor_sets_;
+  // Minimap descriptor sets, one per in-flight frame.
+  std::vector<VkDescriptorSet> minimap_sets_;
 
   // Image-available semaphores, one per in-flight frame.
   std::vector<VkSemaphore> image_available_;
@@ -188,10 +232,12 @@ public:
   // `Tile::Empty`.
   void BuildMaze(const Maze &maze);
 
-  // Record and submit one frame with instanced wall and floor draws.
+  // Record and submit one frame with instanced wall and floor draws,
+  // plus the minimap overlay when requested.
   // - `camera` - Camera used for the view matrix.
   // - `aspect` - Aspect ratio of the viewport.
-  void Draw(const Camera &camera, float aspect);
+  // - `minimap` - Minimap overlay request for this frame.
+  void Draw(const Camera &camera, float aspect, const MinimapArgs &minimap);
 
   // Block until the GPU is idle.
   void WaitIdle();
@@ -325,6 +371,33 @@ private:
   // Return true on success, false on failure.
   bool CreateGraphicsPipelines();
 
+  // Create the minimap overlay pipeline.
+  // Return true on success, false on failure.
+  bool CreateMinimapPipeline();
+
+  // Build the minimap cell buffer from the maze.
+  // - `maze` - Generated maze to render.
+  void BuildMinimapBuffer(const Maze &maze);
+
+  // Destroy the minimap cell buffer and its memory.
+  void DestroyMinimapBuffer();
+
+  // Point minimap descriptor sets at the current cell buffer.
+  void UpdateMinimapDescriptors();
+
+  // Compute minimap push constants for one frame.
+  // - `minimap` - Minimap overlay request for this frame.
+  // Return push constants positioning a centered overlay.
+  [[nodiscard]] MinimapPushConstants
+  PushForMinimap(const MinimapArgs &minimap) const;
+
+  // Record the minimap overlay draw into a command buffer.
+  // - `cmd` - Command buffer to record.
+  // - `frame` - In-flight frame index selecting the descriptor set.
+  // - `minimap` - Minimap overlay request for this frame.
+  void RecordMinimap(VkCommandBuffer cmd, std::size_t frame,
+                       const MinimapArgs &minimap);
+
   // Create the depth image and view matching the swapchain extent.
   // Return true on success, false on failure.
   bool CreateDepthResources();
@@ -372,12 +445,13 @@ private:
   void UpdateUniformBuffer(std::size_t frame, const Camera &camera,
                            float aspect);
 
-  // Record wall and floor instanced draws into a command buffer.
+  // Record wall, floor, and minimap draws into a command buffer.
   // - `cmd` - Command buffer to record.
   // - `image_index` - Swapchain image (framebuffer) index.
   // - `frame` - In-flight frame index selecting the descriptor sets.
+  // - `minimap` - Minimap overlay request for this frame.
   void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t image_index,
-                           std::size_t frame);
+                           std::size_t frame, const MinimapArgs &minimap);
 };
 
 } // namespace flying_rat

@@ -23,6 +23,7 @@ target_sources(flying-rat
         src/main.cpp
         src/vulkan/core.cpp
         src/vulkan/device.cpp
+        src/vulkan/minimap.cpp
         src/vulkan/pipeline.cpp
         src/vulkan/resources.cpp
     PRIVATE
@@ -79,11 +80,31 @@ add_custom_command(
     DEPENDS ${SLANG_DIR}/floor.slang
     VERBATIM)
 
+add_custom_command(
+    OUTPUT ${SPIRV_DIR}/minimap.vert.spv
+    COMMAND ${SLANGC} ${SLANG_DIR}/minimap.slang
+        -target spirv
+        -entry VertexMain -stage vertex
+        -o ${SPIRV_DIR}/minimap.vert.spv
+    DEPENDS ${SLANG_DIR}/minimap.slang
+    VERBATIM)
+
+add_custom_command(
+    OUTPUT ${SPIRV_DIR}/minimap.frag.spv
+    COMMAND ${SLANGC} ${SLANG_DIR}/minimap.slang
+        -target spirv
+        -entry FragmentMain -stage fragment
+        -o ${SPIRV_DIR}/minimap.frag.spv
+    DEPENDS ${SLANG_DIR}/minimap.slang
+    VERBATIM)
+
 add_custom_target(shaders ALL
     DEPENDS
         ${SPIRV_DIR}/wall.vert.spv
         ${SPIRV_DIR}/wall.frag.spv
         ${SPIRV_DIR}/floor.vert.spv
-        ${SPIRV_DIR}/floor.frag.spv)
+        ${SPIRV_DIR}/floor.frag.spv
+        ${SPIRV_DIR}/minimap.vert.spv
+        ${SPIRV_DIR}/minimap.frag.spv)
 
 add_dependencies(flying-rat shaders)

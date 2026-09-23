@@ -237,10 +237,13 @@ bool Renderer::CreateGraphicsPipelines() {
     return false;
   }
 
+  // One shared range covers both the scene and the minimap push constants.
   VkPushConstantRange push{};
   push.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
   push.offset = 0;
-  push.size = sizeof(PushConstants);
+  push.size = sizeof(PushConstants) > sizeof(MinimapPushConstants)
+                  ? sizeof(PushConstants)
+                  : sizeof(MinimapPushConstants);
 
   VkPipelineLayoutCreateInfo layout_info{};
   layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;

@@ -48,6 +48,8 @@ bool Renderer::Initialize(GLFWwindow *window) {
     return false;
   if (!CreateGraphicsPipelines())
     return false;
+  if (!CreateMinimapPipeline())
+    return false;
   if (!CreateDepthResources())
     return false;
   if (!CreateFramebuffers())
@@ -101,16 +103,21 @@ void Renderer::BuildMaze(const Maze &maze) {
                      wall_instance_count_);
   RecreateTileBuffer(floor_tile_buffer_, floor_tile_memory_, floors,
                      floor_instance_count_);
+  BuildMinimapBuffer(maze);
   UpdateDescriptors();
+  UpdateMinimapDescriptors();
 
   std::println("[renderer] maze instances: {} walls, {} floors",
                wall_instance_count_, floor_instance_count_);
 }
 
-// Record and submit one frame with instanced wall and floor draws.
+// Record and submit one frame with instanced wall and floor draws,
+// plus the minimap overlay when requested.
 // - `camera` - Camera used for the view matrix.
 // - `aspect` - Aspect ratio of the viewport.
-void Renderer::Draw(const Camera &camera, float aspect) {
+// - `minimap` - Minimap overlay request for this frame.
+void Renderer::Draw(const Camera &camera, float aspect,
+                    const MinimapArgs &minimap) {
   if (device_ == VK_NULL_HANDLE || swapchain_ == VK_NULL_HANDLE) {
     return;
   }
@@ -145,7 +152,7 @@ void Renderer::Draw(const Camera &camera, float aspect) {
   vkResetFences(device_, 1, &in_flight_[current_frame_]);
   vkResetCommandBuffer(command_buffers_[current_frame_], 0);
   RecordCommandBuffer(command_buffers_[current_frame_], image_index,
-                      current_frame_);
+                      current_frame_, minimap);
 
   VkSemaphore wait[] = {image_available_[current_frame_]};
   VkPipelineStageFlags wait_stages[] = {
@@ -234,6 +241,9 @@ void Renderer::Destroy() {
   }
   wall_sets_.clear();
   floor_sets_.clear();
+  minimap_sets_.clear();
+
+  DestroyMinimapBuffer();
 
   DestroyTileBuffer(wall_tile_buffer_, wall_tile_memory_);
   DestroyTileBuffer(floor_tile_buffer_, floor_tile_memory_);
@@ -278,6 +288,10 @@ void Renderer::Destroy() {
     depth_memory_ = VK_NULL_HANDLE;
   }
 
+  if (minimap_pipeline_ != VK_NULL_HANDLE) {
+    vkDestroyPipeline(device_, minimap_pipeline_, nullptr);
+    minimap_pipeline_ = VK_NULL_HANDLE;
+  }
   if (wall_pipeline_ != VK_NULL_HANDLE) {
     vkDestroyPipeline(device_, wall_pipeline_, nullptr);
     wall_pipeline_ = VK_NULL_HANDLE;

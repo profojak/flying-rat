@@ -23,4 +23,7 @@ inline constexpr float fov_degrees = 75.0f;
 inline constexpr float near_plane = 0.05f;
 inline constexpr float far_plane = 100.0f;
 
+// Fraction of the smaller window dimension used for the minimap.
+inline constexpr float minimap_scale = 0.6f;
+
 } // namespace flying_rat::config

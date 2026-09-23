@@ -7,6 +7,7 @@ module;
 #include <glm/glm.hpp>
 
 #include <chrono>
+#include <cmath>
 #include <print>
 #include <random>
 
@@ -42,6 +43,10 @@ private:
   bool first_mouse_ = true;
   // True after announcing exit once to avoid log spam.
   bool exit_announced_ = false;
+  // True while the minimap overlay is shown.
+  bool show_minimap_ = false;
+  // Previous `M` key state minimap toggle.
+  int minimap_key_prev_ = GLFW_RELEASE;
 
 public:
   App() = default;
@@ -148,13 +153,20 @@ private:
       pending_pitch_ = 0.0f;
       player_.Update(delta, input, maze_);
 
+      int minimap_key = glfwGetKey(window_, GLFW_KEY_M);
+      if (minimap_key == GLFW_PRESS && minimap_key_prev_ == GLFW_RELEASE) {
+        show_minimap_ = !show_minimap_;
+        std::println("[app] minimap {}", show_minimap_ ? "on" : "off");
+      }
+      minimap_key_prev_ = minimap_key;
+
       int width = 0;
       int height = 0;
       glfwGetFramebufferSize(window_, &width, &height);
       float aspect =
           (height > 0) ? static_cast<float>(width) / static_cast<float>(height)
                        : 1.0f;
-      renderer_.Draw(player_.GetCamera(), aspect);
+      renderer_.Draw(player_.GetCamera(), aspect, MinimapForFrame());
 
       if (player_.AtExit(maze_)) {
         if (!exit_announced_) {
@@ -165,6 +177,20 @@ private:
         exit_announced_ = false;
       }
     }
+  }
+
+  // Build the minimap overlay request for the current frame.
+  [[nodiscard]] MinimapArgs MinimapForFrame() const {
+    MinimapArgs args;
+    args.visible = show_minimap_;
+    if (!show_minimap_) {
+      return args;
+    }
+    glm::vec3 pos = player_.Position();
+    args.player_cell = {
+        static_cast<int>(std::floor(pos.x / config::tile_size)),
+        static_cast<int>(std::floor(pos.z / config::tile_size))};
+    return args;
   }
 
   // Shut down the application and clean up resources.
