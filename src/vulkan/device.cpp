@@ -67,21 +67,6 @@ bool Renderer::CreateInstance() {
   info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
   info.ppEnabledExtensionNames = extensions.data();
 
-  // Validation layers are optional, continue without them on machines
-  // that only ship the loader and MoltenVK.
-  const char *validation = "VK_LAYER_KHRONOS_validation";
-  uint32_t layer_count = 0;
-  vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
-  std::vector<VkLayerProperties> layers(layer_count);
-  vkEnumerateInstanceLayerProperties(&layer_count, layers.data());
-  for (const auto &l : layers) {
-    if (std::strcmp(l.layerName, validation) == 0) {
-      info.enabledLayerCount = 1;
-      info.ppEnabledLayerNames = &validation;
-      break;
-    }
-  }
-
   if (vkCreateInstance(&info, nullptr, &instance_) != VK_SUCCESS) {
     std::println("[renderer] vkCreateInstance failed");
     return false;
