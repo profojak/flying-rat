@@ -38,73 +38,41 @@ target_sources(flying-rat
 
 target_link_libraries(flying-rat PRIVATE glfw Vulkan::Vulkan glm::glm)
 
-target_compile_definitions(flying-rat PRIVATE SHADER_DIR="${SPIRV_DIR}")
+target_compile_options(flying-rat PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>)
 
 # Compile .slang to SPIR-V.
 set(SLANG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/data)
 set(SPIRV_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-add_custom_command(
-    OUTPUT ${SPIRV_DIR}/wall.vert.spv
-    COMMAND ${SLANGC} ${SLANG_DIR}/wall.slang
-        -target spirv
-        -entry VertexMain -stage vertex
-        -o ${SPIRV_DIR}/wall.vert.spv
-    DEPENDS ${SLANG_DIR}/wall.slang
-    VERBATIM)
+target_compile_definitions(flying-rat PRIVATE SHADER_DIR="${SPIRV_DIR}")
 
-add_custom_command(
-    OUTPUT ${SPIRV_DIR}/wall.frag.spv
-    COMMAND ${SLANGC} ${SLANG_DIR}/wall.slang
-        -target spirv
-        -entry FragmentMain -stage fragment
-        -o ${SPIRV_DIR}/wall.frag.spv
-    DEPENDS ${SLANG_DIR}/wall.slang
-    VERBATIM)
+set(SHADERS wall floor minimap)
+set(SHADER_OUTPUTS "")
+foreach(name IN LISTS SHADERS)
+    foreach(stage IN ITEMS vert frag)
+        if(stage STREQUAL vert)
+            set(entry VertexMain)
+            set(slang_stage vertex)
+        else()
+            set(entry FragmentMain)
+            set(slang_stage fragment)
+        endif()
+        set(output ${SPIRV_DIR}/${name}.${stage}.spv)
+        add_custom_command(
+            OUTPUT ${output}
+            COMMAND ${SLANGC} ${SLANG_DIR}/${name}.slang
+                -target spirv
+                -entry ${entry} -stage ${slang_stage}
+                -o ${output}
+            DEPENDS ${SLANG_DIR}/${name}.slang
+            COMMENT "Compiling ${name}.slang (${slang_stage}) to SPIR-V"
+            VERBATIM)
+        list(APPEND SHADER_OUTPUTS ${output})
+    endforeach()
+endforeach()
 
-add_custom_command(
-    OUTPUT ${SPIRV_DIR}/floor.vert.spv
-    COMMAND ${SLANGC} ${SLANG_DIR}/floor.slang
-        -target spirv
-        -entry VertexMain -stage vertex
-        -o ${SPIRV_DIR}/floor.vert.spv
-    DEPENDS ${SLANG_DIR}/floor.slang
-    VERBATIM)
-
-add_custom_command(
-    OUTPUT ${SPIRV_DIR}/floor.frag.spv
-    COMMAND ${SLANGC} ${SLANG_DIR}/floor.slang
-        -target spirv
-        -entry FragmentMain -stage fragment
-        -o ${SPIRV_DIR}/floor.frag.spv
-    DEPENDS ${SLANG_DIR}/floor.slang
-    VERBATIM)
-
-add_custom_command(
-    OUTPUT ${SPIRV_DIR}/minimap.vert.spv
-    COMMAND ${SLANGC} ${SLANG_DIR}/minimap.slang
-        -target spirv
-        -entry VertexMain -stage vertex
-        -o ${SPIRV_DIR}/minimap.vert.spv
-    DEPENDS ${SLANG_DIR}/minimap.slang
-    VERBATIM)
-
-add_custom_command(
-    OUTPUT ${SPIRV_DIR}/minimap.frag.spv
-    COMMAND ${SLANGC} ${SLANG_DIR}/minimap.slang
-        -target spirv
-        -entry FragmentMain -stage fragment
-        -o ${SPIRV_DIR}/minimap.frag.spv
-    DEPENDS ${SLANG_DIR}/minimap.slang
-    VERBATIM)
-
-add_custom_target(shaders ALL
-    DEPENDS
-        ${SPIRV_DIR}/wall.vert.spv
-        ${SPIRV_DIR}/wall.frag.spv
-        ${SPIRV_DIR}/floor.vert.spv
-        ${SPIRV_DIR}/floor.frag.spv
-        ${SPIRV_DIR}/minimap.vert.spv
-        ${SPIRV_DIR}/minimap.frag.spv)
+add_custom_target(shaders ALL DEPENDS ${SHADER_OUTPUTS})
 
 add_dependencies(flying-rat shaders)
