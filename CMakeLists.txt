@@ -26,6 +26,7 @@ target_sources(flying-rat
         src/vulkan/minimap.cpp
         src/vulkan/pipeline.cpp
         src/vulkan/resources.cpp
+        src/vulkan/texture.cpp
     PRIVATE
         FILE_SET CXX_MODULES
         FILES
@@ -46,7 +47,13 @@ target_compile_options(flying-rat PRIVATE
 set(SLANG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/data)
 set(SPIRV_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-target_compile_definitions(flying-rat PRIVATE SHADER_DIR="${SPIRV_DIR}")
+target_compile_definitions(flying-rat PRIVATE
+    SHADER_DIR="${SPIRV_DIR}"
+    DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
+
+# Make `data/wall.jpg` available next to the compiled SPIR-V shaders.
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/data/wall.jpg
+    ${SPIRV_DIR}/wall.jpg COPYONLY)
 
 set(SHADERS wall floor minimap)
 set(SHADER_OUTPUTS "")
