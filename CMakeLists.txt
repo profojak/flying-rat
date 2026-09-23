@@ -21,6 +21,10 @@ add_executable(flying-rat)
 target_sources(flying-rat
     PRIVATE
         src/main.cpp
+        src/vulkan/core.cpp
+        src/vulkan/device.cpp
+        src/vulkan/pipeline.cpp
+        src/vulkan/resources.cpp
     PRIVATE
         FILE_SET CXX_MODULES
         FILES
