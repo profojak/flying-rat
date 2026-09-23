@@ -292,8 +292,8 @@ void Renderer::UpdateUniformBuffer(std::size_t frame, const Camera &camera,
   FrameUniforms uniforms{};
   uniforms.view_projection =
       camera.ProjectionMatrix(aspect) * camera.ViewMatrix();
-  uniforms.light_direction = glm::normalize(glm::vec3(-0.6f, -1.0f, -0.4f));
-  uniforms.ambient = 0.35f;
+  uniforms.light_direction = glm::normalize(config::light_direction);
+  uniforms.ambient = config::ambient_strength;
   std::memcpy(uniform_mapped_[frame], &uniforms, sizeof(uniforms));
 }
 
@@ -310,7 +310,8 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer cmd, uint32_t image_index,
   vkBeginCommandBuffer(cmd, &begin);
 
   VkClearValue clear[2]{};
-  clear[0].color = {{0.08f, 0.09f, 0.11f, 1.0f}};
+  clear[0].color = {{config::clear_color.r, config::clear_color.g,
+                       config::clear_color.b, config::clear_color.a}};
   clear[1].depthStencil = {1.0f, 0};
 
   VkRenderPassBeginInfo pass{};

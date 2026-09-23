@@ -188,8 +188,9 @@ private:
   // Current in-flight frame index.
   std::size_t current_frame_ = 0;
 
-  // Frames that can be in flight at once.
-  static constexpr std::size_t max_frames_in_flight_ = 2;
+  // Frames that can be in flight at once (see `config::max_frames_in_flight`).
+  static constexpr std::size_t max_frames_in_flight_ =
+      config::max_frames_in_flight;
   // Vertices per wall instance: 4 sides x 2 triangles x 3 verts.
   static constexpr uint32_t wall_vertices_ = 24;
   // Vertices per floor instance: 1 quad x 2 triangles x 3 verts.

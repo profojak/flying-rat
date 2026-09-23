@@ -14,6 +14,8 @@ module;
 
 export module flying_rat.maze;
 
+import flying_rat.config;
+
 namespace flying_rat {
 
 // Represent a tile type of the maze.
@@ -163,7 +165,9 @@ public:
     const glm::ivec2 exit{size_.x - STEP, size_.y - STEP};
 
     int carved = 0;
-    for (int attempt = 0; attempt < 20 && carved < 4; ++attempt) {
+    for (int attempt = 0;
+         attempt < config::room_attempts && carved < config::max_rooms;
+         ++attempt) {
       const int cx = x_dist(rng);
       const int cy = y_dist(rng);
       if (At(cx, cy) != Tile::Empty) {
