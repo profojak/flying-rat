@@ -39,19 +39,33 @@ bool Renderer::CreateInstance() {
   uint32_t glfw_count = 0;
   const char **glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_count);
 
-  // MoltenVK on MacOS needs `VK_KHR_portability_enumeration`.
   std::vector<const char *> extensions;
   for (uint32_t i = 0; i < glfw_count; ++i) {
     extensions.push_back(glfw_extensions[i]);
   }
-  extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
 
   VkInstanceCreateInfo info{};
   info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   info.pApplicationInfo = &app_info;
+
+  // Only enable `VK_KHR_portability_enumeration` if the loader supports it.
+  {
+    uint32_t count = 0;
+    vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr);
+    std::vector<VkExtensionProperties> available(count);
+    vkEnumerateInstanceExtensionProperties(nullptr, &count, available.data());
+    for (const auto &ext : available) {
+      if (std::strcmp(ext.extensionName,
+                      VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0) {
+        extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+        info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+        break;
+      }
+    }
+  }
+
   info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
   info.ppEnabledExtensionNames = extensions.data();
-  info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 
   // Validation layers are optional, continue without them on machines
   // that only ship the loader and MoltenVK.
