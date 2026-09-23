@@ -337,10 +337,11 @@ private:
                           const std::vector<glm::vec2> &tiles,
                           uint32_t &out_count);
 
-  // Read a whole binary file.
+  // Read a whole SPIR-V file.
   // - `path` - File to read.
-  // Return file bytes, empty on failure.
-  [[nodiscard]] static std::vector<char>
+  // Return file words (4-byte aligned for `vkCreateShaderModule`), empty on
+  // failure or when the size is not a multiple of 4.
+  [[nodiscard]] static std::vector<std::uint32_t>
   ReadFile(const std::filesystem::path &path);
 
   // Resolve a shader file, trying the CMake SPIR-V directory first.
@@ -350,10 +351,10 @@ private:
   FindShaderFile(const char *filename);
 
   // Create a shader module from SPIR-V code.
-  // - `code` - SPIR-V bytes.
+  // - `code` - SPIR-V words, must be 4-byte aligned and non-empty.
   // Return the module, or `VK_NULL_HANDLE` on failure.
   [[nodiscard]] VkShaderModule
-  CreateShaderModule(const std::vector<char> &code);
+  CreateShaderModule(const std::vector<std::uint32_t> &code);
 
   // Create the render pass with color and depth attachments.
   // Return true on success, false on failure.
@@ -396,7 +397,7 @@ private:
   // - `frame` - In-flight frame index selecting the descriptor set.
   // - `minimap` - Minimap overlay request for this frame.
   void RecordMinimap(VkCommandBuffer cmd, std::size_t frame,
-                       const MinimapArgs &minimap);
+                     const MinimapArgs &minimap);
 
   // Create the depth image and view matching the swapchain extent.
   // Return true on success, false on failure.

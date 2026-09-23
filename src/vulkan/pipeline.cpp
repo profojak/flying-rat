@@ -27,17 +27,29 @@ namespace flying_rat {
 // Read a whole binary file.
 // - `path` - File to read.
 // Return file bytes, empty on failure.
-[[nodiscard]] std::vector<char>
+[[nodiscard]] std::vector<std::uint32_t>
 Renderer::ReadFile(const std::filesystem::path &path) {
   std::ifstream file(path, std::ios::ate | std::ios::binary);
   if (!file.is_open()) {
     return {};
   }
-  auto size = file.tellg();
-  std::vector<char> bytes(static_cast<std::size_t>(size));
+  std::streampos end = file.tellg();
+  if (end == std::streampos(-1)) {
+    return {};
+  }
+  auto size = static_cast<std::uint64_t>(end);
+  if (size == 0 || size % sizeof(std::uint32_t) != 0) {
+    return {};
+  }
+  std::vector<std::uint32_t> words(
+      static_cast<std::size_t>(size / sizeof(std::uint32_t)));
   file.seekg(0);
-  file.read(bytes.data(), size);
-  return bytes;
+  file.read(reinterpret_cast<char *>(words.data()),
+            static_cast<std::streamsize>(size));
+  if (!file) {
+    return {};
+  }
+  return words;
 }
 
 // Resolve a shader file, trying the CMake SPIR-V directory first.
@@ -65,11 +77,15 @@ Renderer::FindShaderFile(const char *filename) {
 // - `code` - SPIR-V bytes.
 // Return the module, or `VK_NULL_HANDLE` on failure.
 [[nodiscard]] VkShaderModule
-Renderer::CreateShaderModule(const std::vector<char> &code) {
+Renderer::CreateShaderModule(const std::vector<std::uint32_t> &code) {
+  if (code.empty()) {
+    std::println("[renderer] vkCreateShaderModule failed: empty SPIR-V");
+    return VK_NULL_HANDLE;
+  }
   VkShaderModuleCreateInfo info{};
   info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  info.codeSize = code.size();
-  info.pCode = reinterpret_cast<const uint32_t *>(code.data());
+  info.codeSize = code.size() * sizeof(std::uint32_t);
+  info.pCode = code.data();
 
   VkShaderModule module = VK_NULL_HANDLE;
   if (vkCreateShaderModule(device_, &info, nullptr, &module) != VK_SUCCESS) {
