@@ -57,6 +57,8 @@ Although the parameters are not tweakable at runtime, they can be adjusted in
 `src/config.cppm` and recompiled. There are many things that can be tweaked,
 some of them are shown in the images below.
 
+![config](config.jpg)
+
 # Architecture
 
 The total line count is ~3850 of C++ and ~345 of Slang shaders.
